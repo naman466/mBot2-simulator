@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from '@sveltejs/adapter-static';
 import preprocess from 'svelte-preprocess';
 const { scss } = preprocess;
 
@@ -8,7 +8,9 @@ const config = {
 	// for more information about preprocessors
 	preprocess: preprocess({ preprocess: [scss()] }),
 	kit: {
-		adapter: adapter({ out: 'build' })
+		// Everything runs in the browser, so the build is plain static files
+		// that any static host (or `node serve.js`) can serve.
+		adapter: adapter({ pages: 'build', assets: 'build' })
 	}
 };
 

@@ -19,7 +19,7 @@ export enum ScratchType {
   Variable = 12,
   List = 13,
 }
-export type Input = [ScratchType, (string | Input), (string | undefined)];
+export type Input = [ScratchType, (string | Input | null), (string | Input | undefined)?];
 export type Inputs = { [index: string]: Input; };
 export type Field = [string, string?];
 export type Fields = { [index: string]: Field; };
@@ -51,14 +51,23 @@ export class Block {
   public readonly next: string | null;
   public readonly inputs: Inputs;
   public readonly fields: Fields;
+  public readonly shadow: boolean;
+  /** Whether the block starts a script on the workspace, and where. */
+  public readonly topLevel: boolean;
+  public readonly x: number;
+  public readonly y: number;
   public readonly mutation?: Mutation;
 
   public constructor(id: string, block: any) {
     this.id = id;
     this.opcode = block.opcode;
     this.next = block.next;
-    this.inputs = block.inputs;
-    this.fields = block.fields;
+    this.inputs = block.inputs || {};
+    this.fields = block.fields || {};
+    this.shadow = Boolean(block.shadow);
+    this.topLevel = Boolean(block.topLevel);
+    this.x = Number(block.x) || 0;
+    this.y = Number(block.y) || 0;
     if (block.mutation) this.mutation = new Mutation(block.mutation);
   }
 }

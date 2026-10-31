@@ -6,13 +6,13 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
+		"start": "node serve.js",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "next",
-		"@sveltejs/adapter-node": "^1.0.0-next.96",
-		"@sveltejs/kit": "next",
+		"@sveltejs/adapter-static": "1.0.0-next.43",
+		"@sveltejs/kit": "1.0.0-next.480",
 		"sass": "^1.54.5",
 		"svelte": "^3.44.0",
 		"svelte-check": "^2.7.1",
@@ -23,7 +23,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@zip.js/zip.js": "^2.6.29",
-		"pixi.js": "^6.5.1"
+		"@zip.js/zip.js": "^2.6.29"
 	}
 }

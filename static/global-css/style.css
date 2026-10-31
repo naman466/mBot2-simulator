@@ -1,11 +1,21 @@
 :root {
-  --background: hsl(227, 10%, 17%);
-  --background-light: hsl(227, 11%, 25%);
-  --primary: hsl(148, 100%, 37%);
-  --text: hsl(0, 0%, 96%);
-  --radius: 6px;
+  --bg: #eef2f6;
+  --panel: #ffffff;
+  --panel-2: #f5f7fa;
+  --border: #dde3ea;
+  --text: #1f2933;
+  --muted: #6b7785;
+  --primary: #1e88e5;
+  --primary-dark: #1565c0;
+  --go: #2e9e4f;
+  --go-dark: #237a3c;
+  --stop: #e53935;
+  --stop-dark: #b71c1c;
+  --warn-bg: #fff6e0;
+  --warn: #8a5a00;
+  --radius: 10px;
   --padding: 12px;
-  --transition-time: 0.3s;
+  --shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 @font-face {
@@ -13,17 +23,33 @@
   src: url(/fonts/Roboto/Roboto-Regular.ttf);
 }
 
+html,
 body {
-  background-color: var(--background);
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Roboto-Regular', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
 }
 
 h1,
 h2,
-p,
-div,
-button,
-span,
-label {
-  font-family: 'Roboto-Regular';
-  color: var(--text);
+h3 {
+  font-weight: 700;
 }
