@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BlockView from './block-view.svelte';
+	import Icon from '../ui/icon.svelte';
 	import { CodeBuilder } from './build';
 	import { live } from '../live';
 	import type { MBot2 } from '../../mblock/targets/mbot2';
@@ -34,10 +35,10 @@
 
 <div class="code-view">
 	<div class="toolbar">
-		<span class="title">🧩 Code: <strong>{entity.name}</strong></span>
+		<span class="title"><Icon name="blocks" size={16} />Blocks <span class="sub">{entity.name}</span></span>
 		<span class="zoom">
-			<button on:click={() => (zoom = Math.max(0.6, zoom - 0.1))} title="Smaller">A−</button>
-			<button on:click={() => (zoom = Math.min(1.6, zoom + 0.1))} title="Bigger">A+</button>
+			<button on:click={() => (zoom = Math.max(0.6, zoom - 0.1))} title="Smaller blocks" aria-label="Smaller blocks"><Icon name="textSmaller" size={16} /></button>
+			<button on:click={() => (zoom = Math.min(1.6, zoom + 0.1))} title="Bigger blocks" aria-label="Bigger blocks"><Icon name="textBigger" size={16} /></button>
 		</span>
 	</div>
 	<p class="hint">Glowing blocks are running right now. Click a hat block (the top of a script) to run that script.</p>
@@ -73,21 +74,45 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 8px 10px;
+		height: 44px;
+		padding: 0 10px 0 14px;
 		border-bottom: 1px solid var(--border);
 		background: var(--panel);
+		.title {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			font-weight: 650;
+		}
+		.sub {
+			font-weight: 500;
+			color: var(--muted);
+			font-size: 12px;
+		}
+		.zoom {
+			display: inline-flex;
+			gap: 2px;
+		}
 		.zoom button {
-			border: 1px solid var(--border);
-			background: #fff;
+			display: grid;
+			place-items: center;
+			width: 30px;
+			height: 30px;
+			border: none;
+			background: transparent;
 			border-radius: 6px;
-			padding: 2px 6px;
-			font-size: 11px;
+			color: var(--text-2);
+			&:hover {
+				background: var(--panel-3);
+			}
 		}
 	}
 	.hint {
 		color: var(--muted);
-		font-size: 11px;
-		padding: 6px 10px 0;
+		font-size: 12px;
+		padding: 8px 14px;
+		background: var(--panel);
+		border-bottom: 1px solid var(--border);
 	}
 	.scripts {
 		flex: 1;

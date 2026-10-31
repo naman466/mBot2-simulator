@@ -348,15 +348,25 @@ export class Renderer {
     }
 
     // Shadow.
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    roundRect(ctx, BODY.back + 0.8, -BODY.halfWidth - 1.6, BODY.front - BODY.back, BODY.halfWidth * 2 + 4, 3);
+    ctx.save();
+    ctx.shadowColor = "rgba(15, 23, 42, 0.35)";
+    ctx.shadowBlur = 3 * (this.scale * this.dpr);
+    ctx.shadowOffsetX = 0.6 * (this.scale * this.dpr);
+    ctx.shadowOffsetY = 0.9 * (this.scale * this.dpr);
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    roundRect(ctx, BODY.back + 0.4, -BODY.halfWidth - 1.2, BODY.front - BODY.back - 0.6, BODY.halfWidth * 2 + 2.4, 3);
     ctx.fill();
+    ctx.restore();
 
     // Wheels.
     const wheelLen = WHEEL_DIAMETER_CM;
     for (const side of [-1, 1]) {
       const y = side * (TRACK_WIDTH_CM / 2);
-      ctx.fillStyle = "#263238";
+      const tyre = ctx.createLinearGradient(0, y - 1.35, 0, y + 1.35);
+      tyre.addColorStop(0, "#1c2429");
+      tyre.addColorStop(0.5, "#3d4a52");
+      tyre.addColorStop(1, "#1c2429");
+      ctx.fillStyle = tyre;
       roundRect(ctx, -wheelLen / 2, y - 1.35, wheelLen, 2.7, 0.8);
       ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.15)";
@@ -372,6 +382,13 @@ export class Renderer {
     // Chassis.
     ctx.fillStyle = robot.color;
     roundRect(ctx, BODY.back, -BODY.halfWidth + 1.4, BODY.front - BODY.back - 1, BODY.halfWidth * 2 - 2.8, 2.2);
+    ctx.fill();
+    // Soft sheen so the body reads as a 3D shell rather than a flat shape.
+    const sheen = ctx.createLinearGradient(0, -BODY.halfWidth, 0, BODY.halfWidth);
+    sheen.addColorStop(0, "rgba(255,255,255,0.28)");
+    sheen.addColorStop(0.45, "rgba(255,255,255,0.04)");
+    sheen.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = sheen;
     ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.35)";
     ctx.lineWidth = 0.35;

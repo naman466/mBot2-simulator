@@ -6,6 +6,9 @@
 	import ScriptsPanel from '$lib/scripts-panel.svelte';
 	import CodeView from '$lib/code-view/code-view.svelte';
 	import PythonIde from '$lib/python-ide/python-ide.svelte';
+	import Icon from '$lib/ui/icon.svelte';
+	import Logo from '$lib/ui/logo.svelte';
+	import Menu from '$lib/ui/menu.svelte';
 	import TrackTools from '$lib/track-tools.svelte';
 	import TrackEditorPanel from '$lib/track-editor-panel.svelte';
 	import { EXAMPLES } from '$lib/examples';
@@ -69,6 +72,69 @@
 	let leftTab: 'blocks' | 'python' = 'blocks';
 	let pythonIde: PythonIde;
 	let pythonRunning = false;
+
+	// --- Layout: panel widths (resizable, remembered) and the robot panel tab.
+	const LAYOUT_KEY = 'mbot2-sim:layout';
+	let rightTab: 'robot' | 'sensors' | 'data' | 'more' = 'robot';
+	let showSide = true;
+	let codeWidth = 360;
+	let pyWidth = 470;
+	let sideWidth = 360;
+
+	function restoreLayout() {
+		try {
+			const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}');
+			codeWidth = saved.codeWidth ?? codeWidth;
+			pyWidth = saved.pyWidth ?? pyWidth;
+			sideWidth = saved.sideWidth ?? sideWidth;
+		} catch {
+			/* defaults */
+		}
+	}
+
+	/** Drag handler for the panel dividers. */
+	function startResize(which: 'code' | 'side') {
+		return (e: PointerEvent) => {
+			const handle = e.currentTarget as HTMLElement;
+			const main = handle.parentElement as HTMLElement;
+			handle.setPointerCapture(e.pointerId);
+			const move = (ev: PointerEvent) => {
+				const box = main.getBoundingClientRect();
+				if (which === 'code') {
+					const width = Math.round(Math.min(Math.max(ev.clientX - box.left, 260), box.width * 0.55));
+					if (leftTab === 'python') pyWidth = width;
+					else codeWidth = width;
+				} else {
+					sideWidth = Math.round(Math.min(Math.max(box.right - ev.clientX, 300), 520));
+				}
+			};
+			const up = () => {
+				handle.removeEventListener('pointermove', move);
+				handle.removeEventListener('pointerup', up);
+				try {
+					localStorage.setItem(LAYOUT_KEY, JSON.stringify({ codeWidth, pyWidth, sideWidth }));
+				} catch {
+					/* not important */
+				}
+			};
+			handle.addEventListener('pointermove', move);
+			handle.addEventListener('pointerup', up);
+		};
+	}
+
+	/** The Blocks / Python switch: clicking the open view again hides the panel. */
+	function toggleBlocks() {
+		if (showCode && leftTab === 'blocks') showCode = false;
+		else {
+			showCode = true;
+			leftTab = 'blocks';
+		}
+	}
+
+	function togglePython() {
+		if (showCode && leftTab === 'python') showCode = false;
+		else openPython();
+	}
 	let runStartedAt: number | null = null;
 	let results: { name: string; seconds: number; track: string }[] = [];
 	let showTrail = true;
@@ -499,6 +565,9 @@
 
 	onMount(async () => {
 		world = new World();
+		restoreLayout();
+		// Small screens start with the robot panel below the track instead.
+		if (window.innerWidth < 1000) showCode = false;
 		savedTracks = loadSavedTracks();
 		world.loadMap(MAPS[0]);
 		renderer = new Renderer(canvas, world);
@@ -565,45 +634,44 @@
 <input bind:this={trackInput} type="file" accept=".json" hidden on:change={(e) => { openTrackFile(e.currentTarget.files?.[0]); e.currentTarget.value = ''; }} />
 
 <div class="app">
-	<header>
+	<header class="topbar">
 		<div class="brand">
-			<span class="logo">🤖</span>
-			<span class="title">mBot2 Simulator</span>
+			<Logo size={30} />
+			<div class="brand-text">
+				<span class="name">mBot2 Simulator</span>
+				{#if programName}<span class="project" title="Loaded program">{programName}</span>{/if}
+			</div>
 		</div>
 
-		<button class="tool primary" on:click={() => fileInput.click()}>📂 Open .mblock</button>
-		<select
-			class="examples-select"
-			value=""
-			title="Load an example program"
-			on:change={(e) => {
-				openExample(e.currentTarget.value);
-				e.currentTarget.value = '';
-			}}
-		>
-			<option value="" disabled>Examples…</option>
+		<Menu label="File" icon="folder">
+			<button on:click={() => fileInput.click()}><Icon name="folder" />Open program…<span class="menu-hint">.mblock · .py</span></button>
+			<button on:click={() => openPython()}><Icon name="code" />New Python program</button>
+			<div class="menu-sep" />
+			<div class="menu-label">Block examples</div>
 			{#each EXAMPLES as example}
-				<option value={example.id}>{example.name}</option>
+				<button on:click={() => openExample(example.id)}><Icon name="sparkles" />{example.name}</button>
 			{/each}
-		</select>
-		{#if programName}
-			<span class="program" title="Loaded program">{programName}</span>
-		{/if}
-		<button class="tool" class:pressed={showCode && leftTab === 'blocks'} on:click={() => { if (showCode && leftTab === 'blocks') showCode = false; else { showCode = true; leftTab = 'blocks'; } }} disabled={!entity} title="Show the program's blocks">🧩 Blocks</button>
-		<button class="tool" class:pressed={showCode && leftTab === 'python'} on:click={() => { if (showCode && leftTab === 'python') showCode = false; else openPython(); }} title="Write the program in Python (mBlock Python)">🐍 Python</button>
+			<div class="menu-sep" />
+			<div class="menu-label">Tracks</div>
+			<button on:click={newTrack}><Icon name="filePlus" />New track…</button>
+			<button on:click={() => imageInput.click()}><Icon name="image" />Track from a picture…</button>
+			<button on:click={() => trackInput.click()}><Icon name="upload" />Open a track file…</button>
+		</Menu>
 
-		<div class="run-controls">
-			<button class="tool go" on:click={run} disabled={robots.length === 0} title="Start the program (like turning the robot on)">
-				▶ Run
+		<div class="segmented" role="tablist" aria-label="Program view">
+			<button role="tab" class:active={showCode && leftTab === 'blocks'} aria-selected={showCode && leftTab === 'blocks'} disabled={!entity} on:click={toggleBlocks} title="Show the program's blocks">
+				<Icon name="blocks" size={16} />Blocks
 			</button>
-			<button class="tool stop" on:click={stop} disabled={robots.length === 0} title="Stop all scripts and motors">■ Stop</button>
-			<button class="tool" on:click={resetRobots} disabled={robots.length === 0} title="Stop and put the robot back at the start">↺ Reset</button>
-			{#if running}<span class="status">running…</span>{/if}
+			<button role="tab" class:active={showCode && leftTab === 'python'} aria-selected={showCode && leftTab === 'python'} on:click={togglePython} title="Write the program in Python (mBlock Python)">
+				<Icon name="code" size={16} />Python{#if pythonRunning}<span class="live-dot" />{/if}
+			</button>
 		</div>
 
-		<label class="map-select">
-			<span>Track</span>
-			<select value={mapId} on:change={onMapSelect} disabled={Boolean(editor)}>
+		<div class="spacer" />
+
+		<label class="track-picker" title="Track">
+			<Icon name="map" size={16} />
+			<select value={mapId} on:change={onMapSelect} disabled={Boolean(editor)} aria-label="Track">
 				<optgroup label="Practice tracks">
 					{#each MAPS as map}
 						<option value={map.id}>{map.name}</option>
@@ -617,22 +685,35 @@
 					</optgroup>
 				{/if}
 				<optgroup label="Make your own">
-					<option value="__new">➕ New empty track…</option>
-					<option value="__image">📷 Use a picture of a track…</option>
-					<option value="__file">📂 Open a track file…</option>
+					<option value="__new">New empty track…</option>
+					<option value="__image">Use a picture of a track…</option>
+					<option value="__file">Open a track file…</option>
 				</optgroup>
 			</select>
+			<Icon name="chevronDown" size={14} />
 		</label>
+
+		<div class="run-group">
+			<button class="btn run" class:running on:click={run} disabled={robots.length === 0 || Boolean(editor)} title="Start the program (like switching the robot on)">
+				<Icon name="play" size={16} />{running ? 'Running' : 'Run'}
+			</button>
+			<button class="btn stop" on:click={stop} disabled={robots.length === 0} title="Stop all scripts and motors">
+				<Icon name="stop" size={15} />Stop
+			</button>
+			<button class="btn icon-btn" on:click={resetRobots} disabled={robots.length === 0} title="Stop and put the robot back at the start" aria-label="Reset">
+				<Icon name="reset" />
+			</button>
+		</div>
+
+		<button class="btn icon-btn ghost" class:pressed={showSide} on:click={() => (showSide = !showSide)} title={showSide ? 'Hide the robot panel' : 'Show the robot panel'} aria-label="Toggle robot panel">
+			<Icon name="panelRight" />
+		</button>
 	</header>
 
-	<main class:with-code={showCode && entity && !editor} class:wide-code={leftTab === 'python'}>
+	<main>
 		{#if entity}
 			<!-- Kept alive while hidden so a running Python program keeps going. -->
-			<section class="code" class:hidden={!showCode || editor}>
-				<div class="code-tabs">
-					<button class:active={leftTab === 'blocks'} on:click={() => (leftTab = 'blocks')}>🧩 Blocks</button>
-					<button class:active={leftTab === 'python'} on:click={() => (leftTab = 'python')}>🐍 Python{#if pythonRunning} <span class="dot" />{/if}</button>
-				</div>
+			<section class="code" class:hidden={!showCode || editor} style={`width: ${leftTab === 'python' ? pyWidth : codeWidth}px`}>
 				<div class="code-body" class:hidden={leftTab !== 'blocks'}>
 					{#key entity}
 						<CodeView {entity} {tick} />
@@ -647,25 +728,27 @@
 					/>
 				</div>
 			</section>
+			<div class="resizer" class:hidden={!showCode || editor} on:pointerdown={startResize('code')} title="Drag to resize" />
 		{/if}
+
 		<section class="stage" class:dragover={dragOver}>
 			<canvas bind:this={canvas} />
 
-			<div class="stage-tools">
-				<button on:click={() => renderer.zoomBy(1.25)} title="Zoom in">＋</button>
-				<button on:click={() => renderer.zoomBy(0.8)} title="Zoom out">－</button>
-				<button on:click={() => renderer.fit()} title="Show the whole track">⤢</button>
+			<div class="stage-tools" role="toolbar" aria-label="View">
+				<button on:click={() => renderer.zoomBy(1.25)} title="Zoom in" aria-label="Zoom in"><Icon name="zoomIn" /></button>
+				<button on:click={() => renderer.zoomBy(0.8)} title="Zoom out" aria-label="Zoom out"><Icon name="zoomOut" /></button>
+				<button on:click={() => renderer.fit()} title="Show the whole track" aria-label="Fit track"><Icon name="fit" /></button>
 				<span class="sep" />
-				<button on:click={addBox} title="Add a box (an obstacle)">📦</button>
-				<button class:off={!showTrail} on:click={toggleTrail} title="Draw the robot's path">〰</button>
-				<button class:off={!showSensors} on:click={toggleSensors} title="Show what the sensors see">👁</button>
-				<button class:off={muted} on:click={toggleMute} title="Sound on/off">{muted ? '🔇' : '🔊'}</button>
+				<button on:click={addBox} title="Add a box (an obstacle)" aria-label="Add box"><Icon name="box" /></button>
+				<button class:off={!showTrail} on:click={toggleTrail} title="Draw the robot's path" aria-label="Trail"><Icon name="trail" /></button>
+				<button class:off={!showSensors} on:click={toggleSensors} title="Show what the sensors see" aria-label="Sensor view"><Icon name={showSensors ? 'eye' : 'eyeOff'} /></button>
+				<button class:off={muted} on:click={toggleMute} title="Sound on/off" aria-label="Sound"><Icon name={muted ? 'volumeOff' : 'volume'} /></button>
 				<span class="sep" />
-				<button on:click={editCurrentTrack} disabled={Boolean(editor)} title="Edit this track (built-in tracks are copied)">✏️</button>
+				<button on:click={editCurrentTrack} disabled={Boolean(editor)} title="Edit this track (built-in tracks are copied)" aria-label="Edit track"><Icon name="pencil" /></button>
 				{#if currentTrack && !editor}
-					<button on:click={() => currentTrack && downloadTrack(currentTrack)} title="Download this track to share it">⬇</button>
+					<button on:click={() => currentTrack && downloadTrack(currentTrack)} title="Download this track to share it" aria-label="Download track"><Icon name="download" /></button>
 					{#if currentSaved}
-						<button on:click={deleteCurrentTrack} title="Delete this track from the browser">🗑</button>
+						<button class="danger" on:click={deleteCurrentTrack} title="Delete this track from the browser" aria-label="Delete track"><Icon name="trash" /></button>
 					{/if}
 				{/if}
 			</div>
@@ -675,27 +758,37 @@
 			{/if}
 
 			{#if mounted && currentMapInfo && !editor}
-				<div class="map-info">{currentMapInfo.name}: {currentMapInfo.description}</div>
+				<div class="map-chip" title={currentMapInfo.description}>
+					<Icon name="map" size={14} />{currentMapInfo.name}
+				</div>
 			{/if}
 
 			{#if notice}
-				<div class="toast">{notice}</div>
+				<div class="toast" role="status">{notice}</div>
 			{/if}
 
 			{#if mounted && robots.length === 0 && !editor}
 				<div class="welcome">
-					<h1>Welcome! 👋</h1>
-					<ol>
-						<li>Build your program for <strong>CyberPi / mBot2</strong> in mBlock.</li>
-						<li>In mBlock choose <strong>File → Save to your computer</strong>. You get a <code>.mblock</code> file.</li>
-						<li>Drop that file here, or click the button below.</li>
+					<div class="welcome-head">
+						<Logo size={44} />
+						<div>
+							<h1>Welcome to the mBot2 Simulator</h1>
+							<p>Practise mBot2 coding without a robot, with your real mBlock programs.</p>
+						</div>
+					</div>
+					<div class="welcome-actions">
+						<button class="btn primary big" on:click={() => fileInput.click()}><Icon name="folder" />Open a program</button>
+						<button class="btn big" on:click={() => openPython()}><Icon name="code" />Write Python</button>
+					</div>
+					<ol class="steps">
+						<li><span>1</span><div>Build your program for <strong>CyberPi / mBot2</strong> in mBlock.</div></li>
+						<li><span>2</span><div>Choose <strong>File → Save to your computer</strong> to get a <code>.mblock</code> file.</div></li>
+						<li><span>3</span><div>Drop it anywhere on this page, or click <strong>Open a program</strong>.</div></li>
 					</ol>
-					<button class="tool primary big" on:click={() => fileInput.click()}>📂 Open my .mblock file</button>
-					<button class="tool big" on:click={() => openPython()}>🐍 Write a Python program</button>
-					<p class="muted">…or try an example:</p>
 					<div class="examples">
+						<span class="muted">Or try an example</span>
 						{#each EXAMPLES as example}
-							<button class="tool" on:click={() => openExample(example.id)}>{example.name}</button>
+							<button class="chip" on:click={() => openExample(example.id)}><Icon name="sparkles" size={14} />{example.name}</button>
 						{/each}
 					</div>
 					{#if loadError}<p class="error">{loadError}</p>{/if}
@@ -703,97 +796,115 @@
 			{/if}
 
 			{#if dragOver}
-				<div class="drop">Drop your <strong>.mblock</strong> file, a track file or a track picture here</div>
+				<div class="drop"><Icon name="upload" size={28} />Drop an <strong>.mblock</strong> or <strong>.py</strong> program, a track file or a track picture</div>
 			{/if}
 		</section>
 
-		<aside>
+		<div class="resizer" class:hidden={!showSide} on:pointerdown={startResize('side')} title="Drag to resize" />
+		<aside class:hidden={!showSide} style={`width: ${sideWidth}px`}>
 			{#if editor}
-				<div class="card">
-					<TrackEditorPanel
-						{editor}
-						version={editorVersion}
-						saved={editorSaved}
-						on:save={saveEditing}
-						on:download={() => editor && downloadTrack(editor.doc)}
-						on:done={finishEditing}
-						on:discard={discardEditing}
-					/>
-				</div>
-				<p class="help">Scroll to zoom and drag empty floor (with the ↖ tool) to look around. The robots wait at the start while you edit.</p>
-			{:else if entity}
-				{#if robots.length > 1}
-					<div class="tabs">
-						{#each robots as robot, i}
-							<button class:active={i === selected} on:click={() => selectRobot(i)} style={`--c: ${robot.body.color}`}>
-								{robot.name}
-							</button>
-						{/each}
+				<div class="aside-scroll">
+					<div class="card">
+						<TrackEditorPanel
+							{editor}
+							version={editorVersion}
+							saved={editorSaved}
+							on:save={saveEditing}
+							on:download={() => editor && downloadTrack(editor.doc)}
+							on:done={finishEditing}
+							on:discard={discardEditing}
+						/>
 					</div>
-				{/if}
-
-				{#if loadError}<div class="card error">{loadError}</div>{/if}
-
-				<div class="card">
-					<CyberpiDevice {entity} {tick} />
+					<p class="help">Scroll to zoom and drag empty floor (with the select tool) to look around. Robots wait at the start while you edit.</p>
 				</div>
-
-				<details class="card" open>
-					<summary>Sensors</summary>
-					<SensorPanel {entity} {world} {tick} />
-				</details>
-
-				<details class="card" open>
-					<summary>Variables</summary>
-					<VariablesPanel {entity} {tick} />
-				</details>
-
-				{#if results.length > 0}
-					<details class="card" open>
-						<summary>🏁 Finish times</summary>
-						<table class="results">
-							{#each results as r}
-								<tr><td>{r.name}</td><td>{r.track}</td><td class="time">{r.seconds} s</td></tr>
+			{:else if entity}
+				<nav class="side-tabs" role="tablist" aria-label="Robot panel">
+					<button role="tab" class:active={rightTab === 'robot'} on:click={() => (rightTab = 'robot')}><Icon name="cpu" size={16} />Robot</button>
+					<button role="tab" class:active={rightTab === 'sensors'} on:click={() => (rightTab = 'sensors')}><Icon name="activity" size={16} />Sensors</button>
+					<button role="tab" class:active={rightTab === 'data'} on:click={() => (rightTab = 'data')}><Icon name="list" size={16} />Data</button>
+					<button role="tab" class:active={rightTab === 'more'} on:click={() => (rightTab = 'more')}>
+						<Icon name="sliders" size={16} />More{#if warnings.length > 0}<span class="badge">{warnings.length}</span>{/if}
+					</button>
+				</nav>
+				<div class="aside-scroll">
+					{#if robots.length > 1}
+						<div class="robot-switch">
+							{#each robots as robot, i}
+								<button class:active={i === selected} on:click={() => selectRobot(i)} style={`--c: ${robot.body.color}`}>
+									<span class="swatch" />{robot.name}
+								</button>
 							{/each}
-						</table>
-					</details>
-				{/if}
+						</div>
+					{/if}
+					{#if loadError}<div class="card error">{loadError}</div>{/if}
 
-				{#if warnings.length > 0}
-					<details class="card warn" open>
-						<summary>Heads up ({warnings.length})</summary>
-						<ul>
-							{#each warnings as warning}<li>{warning}</li>{/each}
-						</ul>
-					</details>
-				{/if}
-
-				<details class="card">
-					<summary>Scripts &amp; custom blocks</summary>
-					{#key entity}
-						<ScriptsPanel {entity} />
-					{/key}
-				</details>
-
-				<details class="card">
-					<summary>Environment</summary>
-					<label class="slider">
-						<span>Room light (light sensor) <strong>{entity.brightness}</strong></span>
-						<input type="range" min="0" max="100" bind:value={entity.brightness} />
-					</label>
-					<label class="slider">
-						<span>Noise (microphone) <strong>{entity.loudness}</strong></span>
-						<input type="range" min="0" max="100" bind:value={entity.loudness} />
-					</label>
-				</details>
-
-				<p class="help">
-					Drag the robot to move it, drag the blue dot to turn it. Scroll to zoom, drag the floor to look around.
-				</p>
+					{#if rightTab === 'robot'}
+						<div class="card">
+							<CyberpiDevice {entity} {tick} />
+						</div>
+						{#if warnings.length > 0}
+							<button class="notice-card" on:click={() => (rightTab = 'more')}>
+								<Icon name="alert" size={16} />{warnings.length} thing{warnings.length > 1 ? 's' : ''} to check in this program
+							</button>
+						{/if}
+						<p class="help">Drag the robot to move it, drag the blue dot to turn it. Scroll to zoom, drag the floor to look around.</p>
+					{:else if rightTab === 'sensors'}
+						<div class="card">
+							<SensorPanel {entity} {world} {tick} />
+						</div>
+					{:else if rightTab === 'data'}
+						<div class="card">
+							<h3 class="card-title"><Icon name="list" size={16} />Variables</h3>
+							<VariablesPanel {entity} {tick} />
+						</div>
+						<div class="card">
+							<h3 class="card-title"><Icon name="flag" size={16} />Finish times</h3>
+							{#if results.length > 0}
+								<table class="results">
+									{#each results as r}
+										<tr><td>{r.name}</td><td>{r.track}</td><td class="time">{r.seconds} s</td></tr>
+									{/each}
+								</table>
+							{:else}
+								<p class="muted">Drive into a finish zone (e.g. on the Hill climb track) to time a run.</p>
+							{/if}
+						</div>
+					{:else}
+						{#if warnings.length > 0}
+							<div class="card warn">
+								<h3 class="card-title"><Icon name="alert" size={16} />Heads up</h3>
+								<ul>
+									{#each warnings as warning}<li>{warning}</li>{/each}
+								</ul>
+							</div>
+						{/if}
+						<div class="card">
+							<h3 class="card-title"><Icon name="play" size={14} />Scripts &amp; custom blocks</h3>
+							{#key entity}
+								<ScriptsPanel {entity} />
+							{/key}
+						</div>
+						<div class="card">
+							<h3 class="card-title"><Icon name="sliders" size={16} />Environment</h3>
+							<label class="slider">
+								<span>Room light (light sensor)<strong>{entity.brightness}</strong></span>
+								<input type="range" min="0" max="100" bind:value={entity.brightness} />
+							</label>
+							<label class="slider">
+								<span>Noise (microphone)<strong>{entity.loudness}</strong></span>
+								<input type="range" min="0" max="100" bind:value={entity.loudness} />
+							</label>
+						</div>
+					{/if}
+				</div>
 			{:else}
-				<div class="card">
-					<h2>No program yet</h2>
-					<p class="muted">Open an <code>.mblock</code> file to put your mBot2 on the track.</p>
+				<div class="aside-scroll">
+					<div class="empty">
+						<Icon name="robot" size={40} stroke={1.5} />
+						<h2>No robot yet</h2>
+						<p>Open an <code>.mblock</code> or <code>.py</code> program, or start writing Python.</p>
+						<button class="btn primary" on:click={() => fileInput.click()}><Icon name="folder" />Open a program</button>
+					</div>
 				</div>
 			{/if}
 		</aside>
@@ -806,161 +917,211 @@
 		flex-direction: column;
 		height: 100vh;
 	}
-	header {
+
+	/* --- Top bar ------------------------------------------------------------ */
+	.topbar {
 		display: flex;
 		align-items: center;
-		flex-wrap: wrap;
 		gap: 10px;
-		padding: 8px 14px;
+		height: 60px;
+		padding: 0 14px;
 		background: var(--panel);
 		border-bottom: 1px solid var(--border);
-		box-shadow: var(--shadow);
-		z-index: 2;
+		box-shadow: var(--shadow-sm);
+		z-index: 20;
 	}
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		margin-right: 8px;
-		.logo {
-			font-size: 22px;
-		}
-		.title {
+		gap: 10px;
+		margin-right: 6px;
+		min-width: 0;
+	}
+	.brand-text {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.15;
+		min-width: 0;
+		.name {
 			font-weight: 700;
-			font-size: 17px;
+			font-size: 15px;
+			letter-spacing: -0.01em;
+			white-space: nowrap;
+		}
+		.project {
+			font-size: 12px;
+			color: var(--muted);
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-width: 200px;
 		}
 	}
-	.program {
-		background: var(--panel-2);
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		padding: 3px 10px;
-		max-width: 220px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.spacer {
+		flex: 1;
 	}
-	.run-controls {
-		display: flex;
+	.segmented {
+		display: inline-flex;
+		background: var(--panel-3);
+		border-radius: 9px;
+		padding: 3px;
+		gap: 2px;
+		button {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			height: 30px;
+			padding: 0 12px;
+			border: none;
+			background: transparent;
+			border-radius: 7px;
+			font-weight: 600;
+			color: var(--muted);
+			&:hover:not(:disabled) {
+				color: var(--text);
+			}
+			&.active {
+				background: var(--panel);
+				color: var(--text);
+				box-shadow: var(--shadow);
+			}
+			&:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+		}
+	}
+	.live-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--go);
+		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+	}
+	.track-picker {
+		position: relative;
+		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		margin-left: auto;
-	}
-	.status {
-		color: var(--go);
-		font-weight: 700;
-		font-size: 12px;
-	}
-	.examples-select {
+		height: 36px;
+		padding: 0 8px 0 10px;
 		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 7px 8px;
-		background: #fff;
-		font-weight: 700;
-	}
-	.map-select {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		color: var(--muted);
+		border-radius: var(--radius-sm);
+		background: var(--panel);
+		color: var(--text-2);
+		&:hover {
+			border-color: var(--border-strong);
+		}
 		select {
-			border: 1px solid var(--border);
-			border-radius: 8px;
-			padding: 6px 8px;
-			background: #fff;
+			appearance: none;
+			border: none;
+			background: transparent;
+			font-weight: 600;
 			color: var(--text);
+			padding-right: 2px;
+			max-width: 190px;
+			cursor: pointer;
+			&:focus-visible {
+				outline: none;
+			}
+		}
+		&:focus-within {
+			outline: 2px solid var(--primary);
+			outline-offset: 1px;
 		}
 	}
-	.tool {
+	.run-group {
+		display: inline-flex;
+		gap: 6px;
+	}
+
+	/* Buttons */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		height: 36px;
+		padding: 0 14px;
 		border: 1px solid var(--border);
-		background: #fff;
-		border-radius: 8px;
-		padding: 7px 12px;
-		font-weight: 700;
+		background: var(--panel);
+		border-radius: var(--radius-sm);
+		font-weight: 600;
+		color: var(--text-2);
+		transition: background 0.12s, border-color 0.12s, transform 0.06s;
 		&:hover:not(:disabled) {
 			background: var(--panel-2);
+			border-color: var(--border-strong);
+		}
+		&:active:not(:disabled) {
+			transform: translateY(1px);
 		}
 		&:disabled {
 			opacity: 0.45;
 			cursor: not-allowed;
 		}
-		&.primary {
-			background: var(--primary);
-			border-color: var(--primary-dark);
-			color: #fff;
-			&:hover {
-				background: var(--primary-dark);
+		&.icon-btn {
+			width: 36px;
+			padding: 0;
+		}
+		&.ghost {
+			border-color: transparent;
+			background: transparent;
+			&.pressed {
+				background: var(--panel-3);
 			}
 		}
-		&.go {
-			background: var(--go);
-			border-color: var(--go-dark);
+		&.primary {
+			background: var(--primary);
+			border-color: var(--primary);
 			color: #fff;
-			padding: 7px 18px;
+			&:hover:not(:disabled) {
+				background: var(--primary-dark);
+				border-color: var(--primary-dark);
+			}
+		}
+		&.run {
+			background: var(--go);
+			border-color: var(--go);
+			color: #fff;
+			min-width: 92px;
 			&:hover:not(:disabled) {
 				background: var(--go-dark);
+				border-color: var(--go-dark);
+			}
+			&.running {
+				box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.22);
 			}
 		}
 		&.stop {
-			background: var(--stop);
-			border-color: var(--stop-dark);
-			color: #fff;
+			color: var(--stop);
 			&:hover:not(:disabled) {
-				background: var(--stop-dark);
+				background: #fef2f2;
+				border-color: #fecaca;
 			}
 		}
 		&.big {
-			font-size: 16px;
-			padding: 10px 18px;
+			height: 44px;
+			padding: 0 18px;
+			font-size: 15px;
 		}
 	}
+
+	/* --- Layout -------------------------------------------------------------- */
 	main {
 		flex: 1;
 		min-height: 0;
-		display: grid;
-		grid-template-columns: 1fr 380px;
-		&.with-code {
-			grid-template-columns: minmax(260px, 340px) 1fr 380px;
-		}
-		&.with-code.wide-code {
-			grid-template-columns: minmax(320px, 480px) 1fr 360px;
-		}
+		display: flex;
 	}
 	.code {
+		flex: none;
 		min-height: 0;
 		min-width: 0;
-		border-right: 1px solid var(--border);
 		background: var(--panel);
 		display: flex;
 		flex-direction: column;
 		&.hidden {
 			display: none;
-		}
-	}
-	.code-tabs {
-		display: flex;
-		border-bottom: 1px solid var(--border);
-		button {
-			flex: 1;
-			border: none;
-			background: var(--panel-2);
-			padding: 7px;
-			font-weight: 700;
-			color: var(--muted);
-			border-bottom: 3px solid transparent;
-			&.active {
-				background: var(--panel);
-				color: var(--text);
-				border-bottom-color: var(--primary);
-			}
-		}
-		.dot {
-			display: inline-block;
-			width: 8px;
-			height: 8px;
-			border-radius: 50%;
-			background: var(--go);
-			margin-left: 4px;
 		}
 	}
 	.code-body {
@@ -970,26 +1131,34 @@
 			display: none;
 		}
 	}
-	.tool.pressed {
-		background: #e3f0ff;
-		border-color: var(--primary);
-	}
-	.results {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12px;
-		td {
-			padding: 3px 4px;
-			border-bottom: 1px solid var(--border);
+	.resizer {
+		flex: none;
+		width: 6px;
+		margin: 0 -3px;
+		z-index: 5;
+		cursor: col-resize;
+		position: relative;
+		&::after {
+			content: '';
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			left: 2px;
+			width: 1px;
+			background: var(--border);
+			transition: background 0.15s, width 0.15s;
 		}
-		.time {
-			text-align: right;
-			font-weight: 700;
-			font-variant-numeric: tabular-nums;
+		&:hover::after {
+			background: var(--primary);
+			width: 2px;
+		}
+		&.hidden {
+			display: none;
 		}
 	}
 	.stage {
 		position: relative;
+		flex: 1;
 		min-width: 0;
 		min-height: 0;
 		canvas {
@@ -999,208 +1168,424 @@
 			touch-action: none;
 		}
 		&.dragover canvas {
-			filter: brightness(0.9);
+			filter: brightness(0.92);
 		}
 	}
 	.stage-tools {
 		position: absolute;
-		top: 10px;
-		left: 10px;
+		top: 12px;
+		left: 12px;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
-		background: rgba(255, 255, 255, 0.92);
+		gap: 2px;
+		background: rgba(255, 255, 255, 0.96);
 		border: 1px solid var(--border);
-		border-radius: 10px;
+		border-radius: var(--radius);
 		padding: 4px;
 		box-shadow: var(--shadow);
+		backdrop-filter: blur(6px);
 		button {
+			display: grid;
+			place-items: center;
 			width: 34px;
 			height: 34px;
 			border: none;
-			border-radius: 6px;
+			border-radius: 7px;
 			background: transparent;
-			font-size: 16px;
-			&:hover {
-				background: var(--panel-2);
+			color: var(--text-2);
+			&:hover:not(:disabled) {
+				background: var(--panel-3);
+				color: var(--text);
 			}
 			&.off {
-				opacity: 0.35;
+				color: #a7b0bd;
+			}
+			&.danger:hover {
+				color: var(--stop);
+				background: #fef2f2;
 			}
 			&:disabled {
-				opacity: 0.3;
+				opacity: 0.35;
 				cursor: not-allowed;
 			}
 		}
 		.sep {
 			height: 1px;
 			background: var(--border);
-			margin: 2px 4px;
+			margin: 3px 5px;
 		}
 	}
-	.map-info {
+	.map-chip {
 		position: absolute;
-		left: 56px;
-		bottom: 10px;
-		background: rgba(255, 255, 255, 0.92);
+		top: 12px;
+		right: 12px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		background: rgba(255, 255, 255, 0.96);
 		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 4px 10px;
+		border-radius: 999px;
+		padding: 5px 12px;
 		font-size: 12px;
-		color: var(--muted);
-		pointer-events: none;
+		font-weight: 600;
+		color: var(--text-2);
+		box-shadow: var(--shadow-sm);
 	}
 	.toast {
 		position: absolute;
-		top: 10px;
+		bottom: 18px;
 		left: 50%;
 		transform: translateX(-50%);
-		background: #263238;
-		color: #fff;
-		border-radius: 8px;
-		padding: 8px 14px;
-		box-shadow: var(--shadow);
-		max-width: 80%;
+		background: #1f2937;
+		color: #f9fafb;
+		border-radius: var(--radius);
+		padding: 10px 16px;
+		box-shadow: var(--shadow-lg);
+		max-width: min(560px, 86%);
 		text-align: center;
 		pointer-events: none;
+		font-weight: 500;
+		animation: toast-in 0.2s ease-out;
 	}
+	@keyframes toast-in {
+		from {
+			opacity: 0;
+			transform: translate(-50%, 8px);
+		}
+	}
+
+	/* Welcome */
 	.welcome {
 		position: absolute;
 		inset: 0;
 		margin: auto;
-		width: min(460px, 90%);
+		width: min(540px, 92%);
 		height: fit-content;
 		background: var(--panel);
-		border-radius: 16px;
-		box-shadow: 0 10px 40px rgba(16, 24, 40, 0.2);
-		padding: 24px;
+		border: 1px solid var(--border);
+		border-radius: 18px;
+		box-shadow: var(--shadow-lg);
+		padding: 28px;
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 20px;
 		h1 {
-			font-size: 24px;
+			font-size: 21px;
+			margin-bottom: 2px;
 		}
-		ol {
-			padding-left: 20px;
-			display: flex;
-			flex-direction: column;
-			gap: 6px;
+		p {
+			color: var(--muted);
 		}
-		.examples {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 6px;
+	}
+	.welcome-head {
+		display: flex;
+		gap: 14px;
+		align-items: center;
+	}
+	.welcome-actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+	.steps {
+		list-style: none;
+		padding: 14px;
+		margin: 0;
+		background: var(--panel-2);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		color: var(--text-2);
+		li {
+			display: grid;
+			grid-template-columns: 22px 1fr;
+			gap: 10px;
+			align-items: center;
+		}
+		span {
+			flex: none;
+			display: grid;
+			place-items: center;
+			width: 22px;
+			height: 22px;
+			border-radius: 50%;
+			background: var(--primary-soft);
+			color: var(--primary-dark);
+			font-size: 12px;
+			font-weight: 700;
+		}
+	}
+	.examples {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+		.muted {
+			margin-right: 4px;
+		}
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		border-radius: 999px;
+		padding: 5px 12px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text-2);
+		&:hover {
+			border-color: var(--primary);
+			color: var(--primary-dark);
+			background: var(--primary-soft);
 		}
 	}
 	.drop {
 		position: absolute;
 		inset: 16px;
-		border: 3px dashed var(--primary);
-		border-radius: 16px;
-		background: rgba(30, 136, 229, 0.08);
+		border: 2px dashed var(--primary);
+		border-radius: 18px;
+		background: rgba(37, 99, 235, 0.06);
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		font-size: 20px;
+		gap: 10px;
+		font-size: 17px;
 		color: var(--primary-dark);
 		pointer-events: none;
 	}
+
+	/* --- Robot panel ------------------------------------------------------------ */
 	aside {
-		background: var(--bg);
-		border-left: 1px solid var(--border);
-		overflow-y: auto;
-		padding: 10px;
+		flex: none;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		min-height: 0;
+		background: var(--bg);
+		&.hidden {
+			display: none;
+		}
+	}
+	.side-tabs {
+		display: flex;
+		gap: 2px;
+		padding: 8px 10px 0;
+		background: var(--panel);
+		border-bottom: 1px solid var(--border);
+		button {
+			flex: 1;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			height: 38px;
+			border: none;
+			background: transparent;
+			border-bottom: 2px solid transparent;
+			font-weight: 600;
+			font-size: 13px;
+			color: var(--muted);
+			&:hover {
+				color: var(--text);
+			}
+			&.active {
+				color: var(--primary-dark);
+				border-bottom-color: var(--primary);
+			}
+		}
+	}
+	.badge {
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 999px;
+		background: #f59e0b;
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		display: inline-grid;
+		place-items: center;
+	}
+	.aside-scroll {
+		flex: 1;
+		overflow-y: auto;
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 	.card {
 		background: var(--panel);
 		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 10px;
-		box-shadow: var(--shadow);
-		summary {
-			font-weight: 700;
-			cursor: pointer;
-			margin-bottom: 8px;
-		}
-		&:not([open]) summary {
-			margin-bottom: 0;
-		}
+		border-radius: var(--radius-lg);
+		padding: 14px;
+		box-shadow: var(--shadow-sm);
 		&.warn {
 			background: var(--warn-bg);
+			border-color: var(--warn-border);
 			color: var(--warn);
 			ul {
 				padding-left: 18px;
-				font-size: 12px;
+				font-size: 13px;
 				word-break: break-word;
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
 			}
 		}
 		&.error {
 			color: var(--stop-dark);
+			border-color: #fecaca;
+			background: #fef2f2;
 		}
 	}
-	.tabs {
+	.card-title {
 		display: flex;
-		gap: 4px;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		margin-bottom: 10px;
+		color: var(--text);
+	}
+	.notice-card {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		text-align: left;
+		background: var(--warn-bg);
+		border: 1px solid var(--warn-border);
+		color: var(--warn);
+		border-radius: var(--radius);
+		padding: 10px 12px;
+		font-weight: 600;
+		font-size: 13px;
+	}
+	.robot-switch {
+		display: flex;
+		gap: 6px;
 		button {
 			flex: 1;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
 			border: 1px solid var(--border);
-			border-bottom: 3px solid var(--c);
-			background: #fff;
-			border-radius: 8px;
+			background: var(--panel);
+			border-radius: var(--radius-sm);
 			padding: 6px;
+			font-weight: 600;
 			&.active {
-				background: var(--c);
-				color: #fff;
+				border-color: var(--c);
+				box-shadow: 0 0 0 1px var(--c);
 			}
+		}
+		.swatch {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background: var(--c);
 		}
 	}
 	.slider {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		margin-bottom: 8px;
-		font-size: 12px;
+		gap: 4px;
+		margin-bottom: 10px;
+		font-size: 13px;
+		color: var(--text-2);
+		span {
+			display: flex;
+			justify-content: space-between;
+		}
+		input {
+			accent-color: var(--primary);
+		}
+	}
+	.results {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+		td {
+			padding: 5px 4px;
+			border-bottom: 1px solid var(--border);
+		}
+		.time {
+			text-align: right;
+			font-weight: 700;
+			font-variant-numeric: tabular-nums;
+		}
+	}
+	.empty {
+		margin-top: 40px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 10px;
 		color: var(--muted);
+		h2 {
+			color: var(--text);
+			font-size: 17px;
+		}
 	}
 	.help,
 	.muted {
 		color: var(--muted);
-		font-size: 12px;
+		font-size: 12.5px;
 	}
 	.error {
 		color: var(--stop-dark);
 	}
 	code {
-		background: var(--panel-2);
+		background: var(--panel-3);
 		border-radius: 4px;
-		padding: 0 4px;
+		padding: 1px 5px;
+		font-family: var(--mono);
+		font-size: 0.92em;
+	}
+
+	/* --- Smaller screens ---------------------------------------------------------- */
+	@media (max-width: 1180px) {
+		.brand-text {
+			display: none;
+		}
 	}
 	@media (max-width: 900px) {
-		main,
-		main.with-code {
-			grid-template-columns: 1fr;
-			grid-template-rows: auto;
+		.topbar {
+			height: auto;
+			flex-wrap: wrap;
+			padding: 8px 10px;
+		}
+		.spacer {
+			display: none;
+		}
+		main {
+			flex-direction: column;
 			overflow-y: auto;
 		}
-		.stage {
-			height: 60vh;
-			order: -1;
+		.code,
+		aside {
+			width: 100% !important;
 		}
 		.code {
-			max-height: 70vh;
-			border-right: none;
-			border-top: 1px solid var(--border);
+			height: 70vh;
+			order: 2;
+		}
+		.stage {
+			flex: none;
+			height: 60vh;
+			order: 1;
 		}
 		aside {
-			border-left: none;
-			border-top: 1px solid var(--border);
-			overflow: visible;
+			order: 3;
 		}
-		.run-controls {
-			margin-left: 0;
+		.resizer {
+			display: none;
 		}
 	}
 </style>

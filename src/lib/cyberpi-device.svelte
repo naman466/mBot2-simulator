@@ -4,6 +4,7 @@
 	import type { MBot2 } from '../mblock/targets/mbot2';
 	import type { ButtonName, JoystickDirection } from '../mblock/targets/cyberpi';
 	import { drawDisplay, SCREEN_SIZE } from '../sim/display';
+	import Icon from './ui/icon.svelte';
 
 	export let entity: MBot2;
 	export let tick = 0;
@@ -40,7 +41,8 @@
 	};
 	const up = (name: ButtonName | JoystickDirection) => () => entity.release(name);
 
-	const JOYSTICK: [JoystickDirection, string][] = [['up', '▲'], ['left', '◀'], ['middle', '●'], ['right', '▶'], ['down', '▼']];
+	/** Joystick directions and how far to rotate the caret icon. */
+	const JOYSTICK: [JoystickDirection, number][] = [['up', 0], ['left', -90], ['middle', -1], ['right', 90], ['down', 180]];
 </script>
 
 <div class="device">
@@ -63,12 +65,12 @@
 		</div>
 		<div class="side">
 			<div class="joystick" title="Joystick (arrow keys, Enter = press)">
-				{#each JOYSTICK as [dir, icon]}
+				{#each JOYSTICK as [dir, angle]}
 					<button
 						class={`dir ${dir}`}
 						on:pointerdown={down(dir)}
 						on:pointerup={up(dir)}
-						on:pointercancel={up(dir)}>{icon}</button
+						on:pointercancel={up(dir)}>{#if angle < 0}<span class="dot" />{:else}<span style={`display:inline-grid;transform:rotate(${angle}deg)`}><Icon name="caret" size={12} /></span>{/if}</button
 					>
 				{/each}
 			</div>

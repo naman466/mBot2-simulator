@@ -3,6 +3,7 @@
 	import type { TrackEditor } from '../sim/track-editor';
 	import { SWATCHES } from '../sim/colors';
 	import { live } from './live';
+	import Icon from './ui/icon.svelte';
 
 	export let editor: TrackEditor;
 	export let version = 0;
@@ -14,10 +15,10 @@
 	const ZONE_COLORS = [SWATCHES.red, SWATCHES.yellow, SWATCHES.green, SWATCHES.cyan, SWATCHES.blue, SWATCHES.purple, '#111111', '#ffffff'];
 	const WALL_COLORS = ['#8d6e63', '#ff8f00', '#43a047', '#e53935', '#1e88e5', '#8e24aa'];
 	const DIRECTIONS: { deg: number; icon: string; name: string }[] = [
-		{ deg: -90, icon: '⬆', name: 'up' },
-		{ deg: 0, icon: '➡', name: 'right' },
-		{ deg: 90, icon: '⬇', name: 'down' },
-		{ deg: 180, icon: '⬅', name: 'left' },
+		{ deg: -90, icon: 'arrowUp', name: 'up' },
+		{ deg: 0, icon: 'arrowUp', name: 'right' },
+		{ deg: 90, icon: 'arrowUp', name: 'down' },
+		{ deg: 180, icon: 'arrowUp', name: 'left' },
 	];
 	const HINTS: Record<string, string> = {
 		select: 'Click something to select it. Drag to move, drag the blue corner to resize, Delete to remove.',
@@ -26,7 +27,7 @@
 		zone: 'Drag to paint a colored area (a click makes a 30×30 cm square).',
 		wall: 'Drag to place a wall or box. The robot can bump into it and the ultrasonic sensor sees it.',
 		ramp: 'Drag to place a ramp. It slows the robot uphill and tilts CyberPi (tilt and gyro blocks).',
-		finish: 'Drag to place a finish zone. Reaching it shows the time since ▶ Run.',
+		finish: 'Drag to place a finish zone. Reaching it shows the time since Run was pressed.',
 		text: 'Click to place the label text below.',
 		start: 'Click where the robot starts, or drag to also set the direction it faces.',
 		erase: 'Click a piece of the track to remove it.',
@@ -54,7 +55,7 @@
 
 <div class="panel">
 	<div class="title-row">
-		<strong>✏️ Track editor</strong>
+		<strong class="panel-title"><Icon name="pencil" size={16} />Track editor</strong>
 		<span class="badge" class:saved>{saved ? 'saved' : 'not saved'}</span>
 	</div>
 
@@ -110,7 +111,7 @@
 			<span class="group-title">Goes up towards</span>
 			<div class="dirs">
 				{#each DIRECTIONS as d}
-					<button class:on={options.rampUphill === d.deg} on:click={() => setOption('rampUphill', d.deg)} title={d.name}>{d.icon}</button>
+					<button class:on={options.rampUphill === d.deg} on:click={() => setOption('rampUphill', d.deg)} title={d.name} aria-label={d.name}><span style={`display:inline-grid;transform:rotate(${d.deg + 90}deg)`}><Icon name={d.icon} size={16} /></span></button>
 				{/each}
 			</div>
 		</div>
@@ -138,7 +139,7 @@
 				<label class="field"><span>Steepness: {selected.angleDeg}°</span><input type="range" min="3" max="35" value={selected.angleDeg} on:change={(e) => editor.updateSelected({ angleDeg: +e.currentTarget.value })} /></label>
 				<div class="dirs">
 					{#each DIRECTIONS as d}
-						<button class:on={selected.uphillDeg === d.deg} on:click={() => editor.updateSelected({ uphillDeg: d.deg })} title={d.name}>{d.icon}</button>
+						<button class:on={selected.uphillDeg === d.deg} on:click={() => editor.updateSelected({ uphillDeg: d.deg })} title={d.name} aria-label={d.name}><span style={`display:inline-grid;transform:rotate(${d.deg + 90}deg)`}><Icon name={d.icon} size={16} /></span></button>
 					{/each}
 				</div>
 			{:else if selected.kind === 'text'}
@@ -153,9 +154,9 @@
 	{/if}
 
 	<div class="row buttons main">
-		<button class="primary" on:click={() => dispatch('save')}>💾 Save</button>
-		<button on:click={() => dispatch('download')} title="Download a file to share with students">⬇ Share file</button>
-		<button class="go" on:click={() => dispatch('done')}>✔ Done</button>
+		<button class="primary" on:click={() => dispatch('save')}><Icon name="save" size={15} />Save</button>
+		<button on:click={() => dispatch('download')} title="Download a file to share with students"><Icon name="download" size={15} />Share file</button>
+		<button class="go" on:click={() => dispatch('done')}><Icon name="check" size={15} />Done</button>
 	</div>
 	<button class="link" on:click={() => dispatch('discard')}>Discard changes</button>
 </div>
@@ -269,13 +270,21 @@
 			}
 		}
 	}
+	.panel-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
 	.buttons button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		border: 1px solid var(--border);
 		background: #fff;
-		border-radius: 8px;
-		padding: 5px 10px;
-		font-weight: 700;
-		font-size: 12px;
+		border-radius: var(--radius-sm);
+		padding: 6px 12px;
+		font-weight: 600;
+		font-size: 13px;
 		&.primary {
 			background: var(--primary);
 			border-color: var(--primary-dark);

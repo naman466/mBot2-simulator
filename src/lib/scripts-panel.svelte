@@ -3,6 +3,7 @@
 	import type { MBot2 } from '../mblock/targets/mbot2';
 	import type { ProcedureArgs } from '../mblock/context';
 	import { speaker } from '../sim/audio';
+	import Icon from './ui/icon.svelte';
 
 	export let entity: MBot2;
 
@@ -55,14 +56,14 @@
 <div class="scripts">
 	{#each events as { opcode, option }}
 		<button class="run" on:click={() => fire(opcode, option)}>
-			<span class="play">▶</span>
+			<span class="play"><Icon name="play" size={12} /></span>
 			<span>{label(opcode, option)}</span>
 		</button>
 	{/each}
 	{#each procedures as { procCode, argDefs } (procCode)}
 		<div class="procedure">
 			<button class="run" on:click={() => entity.callProcedure(procCode, args[procCode] ?? {})}>
-				<span class="play">▶</span>
+				<span class="play"><Icon name="play" size={12} /></span>
 				<span>{procName(procCode)}</span>
 			</button>
 			{#each argDefs as { name, type } (name)}
@@ -100,12 +101,12 @@
 		padding: 6px 10px;
 		&:hover {
 			border-color: var(--primary);
-			background: #f0f7ff;
+			background: var(--primary-soft);
 		}
 	}
 	.play {
+		display: inline-grid;
 		color: var(--go);
-		font-size: 11px;
 	}
 	.procedure {
 		display: flex;

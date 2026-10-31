@@ -1,21 +1,40 @@
 :root {
-  --bg: #eef2f6;
+  /* Surfaces */
+  --bg: #f3f5f9;
   --panel: #ffffff;
-  --panel-2: #f5f7fa;
-  --border: #dde3ea;
-  --text: #1f2933;
-  --muted: #6b7785;
-  --primary: #1e88e5;
-  --primary-dark: #1565c0;
-  --go: #2e9e4f;
-  --go-dark: #237a3c;
-  --stop: #e53935;
-  --stop-dark: #b71c1c;
-  --warn-bg: #fff6e0;
-  --warn: #8a5a00;
+  --panel-2: #f7f9fc;
+  --panel-3: #eef2f7;
+  --border: #e2e7ee;
+  --border-strong: #ccd5e0;
+
+  /* Text */
+  --text: #17202c;
+  --text-2: #3d4757;
+  --muted: #6b7686;
+
+  /* Brand and actions */
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-soft: #e9f0ff;
+  --go: #16a34a;
+  --go-dark: #15803d;
+  --stop: #dc2626;
+  --stop-dark: #b91c1c;
+  --warn-bg: #fff7e6;
+  --warn: #8a5300;
+  --warn-border: #f7d9a3;
+
+  /* Shape */
+  --radius-sm: 6px;
   --radius: 10px;
+  --radius-lg: 14px;
   --padding: 12px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   --shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 2px 6px rgba(16, 24, 40, 0.06);
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, 'SF Mono', monospace;
 }
 
 @font-face {
@@ -31,9 +50,10 @@ body {
 body {
   background-color: var(--bg);
   color: var(--text);
-  font-family: 'Roboto-Regular', system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -48,8 +68,20 @@ button {
   cursor: pointer;
 }
 
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 h1,
 h2,
 h3 {
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: #c7dbff;
 }

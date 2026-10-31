@@ -11,6 +11,7 @@
 	import { PYTHON_EXAMPLES, STARTER_CODE } from '../../python/examples';
 	import type { MBot2 } from '../../mblock/targets/mbot2';
 	import { speaker } from '../../sim/audio';
+	import Icon from '../ui/icon.svelte';
 
 	export let entity: MBot2;
 	/** Name of the file being edited (shown in the toolbar). */
@@ -199,25 +200,32 @@
 
 <div class="ide">
 	<div class="toolbar">
-		<span class="file" title="File name">🐍 {fileName}</span>
+		<span class="file" title="File name"><Icon name="code" size={16} /><span>{fileName}</span></span>
 		<div class="buttons">
-			<button class="go" on:click={run} disabled={loading} title="Run (Ctrl+Enter or F5)">{loading ? '…' : running ? '↻ Restart' : '▶ Run'}</button>
-			<button class="stop" on:click={stop} disabled={!running} title="Stop">■</button>
-			<button on:click={() => fileInput.click()} title="Open a .py file">📂</button>
-			<button on:click={download} title="Download this program as a .py file">⬇</button>
-			<select value="" on:change={(e) => { pickExample(e.currentTarget.value); e.currentTarget.value = ''; }} title="Python examples">
-				<option value="" disabled>Examples…</option>
-				{#each PYTHON_EXAMPLES as example}
-					<option value={example.id}>{example.name}</option>
-				{/each}
-			</select>
-			<button on:click={() => (fontSize = Math.max(10, fontSize - 1))} title="Smaller text">A−</button>
-			<button on:click={() => (fontSize = Math.min(22, fontSize + 1))} title="Bigger text">A+</button>
+			<button class="go" on:click={run} disabled={loading} title="Run (Ctrl+Enter or F5)">
+				<Icon name={running ? 'reset' : 'play'} size={14} />{loading ? 'Loading…' : running ? 'Restart' : 'Run'}
+			</button>
+			<button class="icon stop" on:click={stop} disabled={!running} title="Stop" aria-label="Stop"><Icon name="stop" size={14} /></button>
+			<span class="divider" />
+			<button class="icon" on:click={() => fileInput.click()} title="Open a .py file" aria-label="Open"><Icon name="folder" size={16} /></button>
+			<button class="icon" on:click={download} title="Download this program as a .py file" aria-label="Download"><Icon name="download" size={16} /></button>
+			<label class="examples" title="Python examples">
+				<Icon name="sparkles" size={15} />
+				<select value="" on:change={(e) => { pickExample(e.currentTarget.value); e.currentTarget.value = ''; }} aria-label="Python examples">
+					<option value="" disabled>Examples</option>
+					{#each PYTHON_EXAMPLES as example}
+						<option value={example.id}>{example.name}</option>
+					{/each}
+				</select>
+			</label>
+			<span class="divider" />
+			<button class="icon" on:click={() => (fontSize = Math.max(10, fontSize - 1))} title="Smaller text" aria-label="Smaller text"><Icon name="textSmaller" size={16} /></button>
+			<button class="icon" on:click={() => (fontSize = Math.min(22, fontSize + 1))} title="Bigger text" aria-label="Bigger text"><Icon name="textBigger" size={16} /></button>
 		</div>
 	</div>
 	<div class="editor" bind:this={editorHost} style={`font-size: ${fontSize}px`} />
 	<div class="console-bar">
-		<span>Output</span>
+		<span class="console-title"><Icon name="terminal" size={14} />Output</span>
 		<button on:click={() => (output = [])}>Clear</button>
 	</div>
 	<pre class="console" bind:this={consoleHost}>{#each output as line}<span class={line.kind}>{line.text}</span>{/each}{#if output.length === 0}<span class="info">print() output and errors show up here. CyberPi's screen is on the right.</span>{/if}</pre>
@@ -236,43 +244,90 @@
 		justify-content: space-between;
 		align-items: center;
 		gap: 6px;
-		padding: 6px 8px;
+		min-height: 44px;
+		padding: 6px 8px 6px 14px;
 		border-bottom: 1px solid var(--border);
 		background: var(--panel);
 	}
 	.file {
-		font-weight: 700;
-		font-size: 12px;
-		max-width: 140px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 650;
+		min-width: 0;
+		span {
+			max-width: 150px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 	.buttons {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 4px;
-		button,
-		select {
-			border: 1px solid var(--border);
-			background: #fff;
+		align-items: center;
+		gap: 2px;
+		button {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			height: 30px;
+			border: none;
+			background: transparent;
 			border-radius: 6px;
-			padding: 3px 7px;
-			font-size: 12px;
-			font-weight: 700;
+			padding: 0 8px;
+			font-weight: 600;
+			color: var(--text-2);
+			&:hover:not(:disabled) {
+				background: var(--panel-3);
+			}
 			&:disabled {
-				opacity: 0.4;
+				opacity: 0.35;
+				cursor: not-allowed;
+			}
+			&.icon {
+				width: 30px;
+				padding: 0;
+				justify-content: center;
 			}
 		}
 		.go {
 			background: var(--go);
-			border-color: var(--go-dark);
 			color: #fff;
+			padding: 0 12px;
+			margin-right: 2px;
+			&:hover:not(:disabled) {
+				background: var(--go-dark);
+			}
 		}
-		.stop {
-			background: var(--stop);
-			border-color: var(--stop-dark);
-			color: #fff;
+		.stop:not(:disabled) {
+			color: var(--stop);
+		}
+		.divider {
+			width: 1px;
+			height: 20px;
+			background: var(--border);
+			margin: 0 4px;
+		}
+		.examples {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			height: 30px;
+			padding: 0 6px;
+			border-radius: 6px;
+			color: var(--text-2);
+			&:hover {
+				background: var(--panel-3);
+			}
+			select {
+				border: none;
+				background: transparent;
+				font-weight: 600;
+				color: var(--text-2);
+				cursor: pointer;
+				max-width: 110px;
+			}
 		}
 	}
 	.editor {
@@ -290,11 +345,16 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 3px 8px;
-		background: #263238;
-		color: #cfd8dc;
-		font-size: 11px;
-		font-weight: 700;
+		padding: 6px 12px;
+		background: #1b2430;
+		color: #c3cad5;
+		font-size: 12px;
+		font-weight: 600;
+		.console-title {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+		}
 		button {
 			border: none;
 			background: transparent;
@@ -305,9 +365,9 @@
 	.console {
 		margin: 0;
 		padding: 6px 8px;
-		background: #1e272c;
-		color: #e0e0e0;
-		font: 12px/1.4 ui-monospace, Consolas, monospace;
+		background: #141b24;
+		color: #e5e9f0;
+		font: 12.5px/1.5 var(--mono);
 		overflow: auto;
 		white-space: pre-wrap;
 		word-break: break-word;
