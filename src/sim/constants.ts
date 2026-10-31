@@ -31,7 +31,8 @@ export const LINE_THRESHOLD = 45;
 
 /** The ultrasonic sensor sits at the very front. */
 export const ULTRASONIC_FORWARD = 10.5;
-export const ULTRASONIC_MIN_CM = 3;
+/** Closer than this the real sensor can't measure and reports the maximum. */
+export const ULTRASONIC_MIN_CM = 4;
 export const ULTRASONIC_MAX_CM = 300;
 /** Half opening angle of the ultrasonic beam. */
 export const ULTRASONIC_HALF_ANGLE_DEG = 8;

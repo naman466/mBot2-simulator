@@ -252,10 +252,10 @@ const ops: Ops<MBot2> = {
     return compare(status, await arg(c, b, "inputMenu_2")) === 0;
   },
   // Line-following status of all four probes (0–15), and "status is …?".
-  "mbuild_quad_color_sensor.mbuild_quad_color_sensor_get_line_sta_with_number": (self) => self.status("line", PROBE_ORDER),
-  "mbuild_quad_color_sensor.mbuild_quad_color_sensor_get_line_sta_with_inputMenu": async (self, c, b) => compare(self.status("line", PROBE_ORDER), await arg(c, b, "inputMenu_2")) === 0,
+  "mbuild_quad_color_sensor.mbuild_quad_color_sensor_get_line_sta_with_number": (self) => self.lineFollowStatus(PROBE_ORDER),
+  "mbuild_quad_color_sensor.mbuild_quad_color_sensor_get_line_sta_with_inputMenu": async (self, c, b) => compare(self.lineFollowStatus(PROBE_ORDER), await arg(c, b, "inputMenu_2")) === 0,
   // L1/R1 line-following status is … (0–3).
-  "mbuild_quad_color_sensor.BLOCK_1617079703409": async (self, c, b) => compare(self.status("line", ["L1", "R1"]), await arg(c, b, "inputMenu_2")) === 0,
+  "mbuild_quad_color_sensor.BLOCK_1617079703409": async (self, c, b) => compare(self.lineFollowStatus(["L1", "R1"]), await arg(c, b, "inputMenu_2")) === 0,
   "mbuild_quad_color_sensor.mbuild_quad_color_sensor_is_color": async (self, c, b) => {
     const probe = probeName(await arg(c, b, "inputMenu_2"));
     const color = toText(await arg(c, b, "inputMenu_3")).toLowerCase();
@@ -431,6 +431,17 @@ export class MBot2 extends CyberPI {
     if (target === "line") return reading.isLine;
     if (target === "ground" || target === "background") return !reading.isLine;
     return this.colorOf(reading.rgb) === target;
+  }
+
+  /**
+   * Line-following status: one bit per probe, leftmost probe = highest bit,
+   * 1 = sees the mat and 0 = on the line (15 = no line), like the real sensor.
+   */
+  public lineFollowStatus(probes: readonly ProbeName[]) {
+    const q = this.quad();
+    let value = 0;
+    for (const p of probes) value = (value << 1) | (q.probes[p].isLine ? 0 : 1);
+    return value;
   }
 
   /** Bit pattern of the probes that see the target, leftmost probe = highest bit. */

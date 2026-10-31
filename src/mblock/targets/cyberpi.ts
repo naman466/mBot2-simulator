@@ -644,12 +644,21 @@ export class CyberPI extends Std {
     return this.pressed.has(name);
   }
 
+  private pressListeners = new Set<(name: ButtonName | JoystickDirection) => void>();
+
+  /** Notifies about button presses (the Python runner uses it for @event.is_press). */
+  public onPress(listener: (name: ButtonName | JoystickDirection) => void) {
+    this.pressListeners.add(listener);
+    return () => { this.pressListeners.delete(listener); };
+  }
+
   /** A button or joystick direction was pressed in the UI. */
   public press(name: ButtonName | JoystickDirection) {
     this.pressed.add(name);
     this.pressCounts[name] = (this.pressCounts[name] ?? 0) + 1;
     const hat = name === "a" || name === "b" ? "cyberpi.cyberpi_when_button_press" : "cyberpi.cyberpi_when_direction_key_press";
     this.runHatBlocks(hat, name);
+    for (const listener of this.pressListeners) listener(name);
   }
 
   public release(name: ButtonName | JoystickDirection) {

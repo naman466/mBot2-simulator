@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick as svelteTick } from 'svelte';
 	import CyberpiDevice from '$lib/cyberpi-device.svelte';
 	import SensorPanel from '$lib/sensor-panel.svelte';
 	import VariablesPanel from '$lib/variables-panel.svelte';
 	import ScriptsPanel from '$lib/scripts-panel.svelte';
 	import CodeView from '$lib/code-view/code-view.svelte';
+	import PythonIde from '$lib/python-ide/python-ide.svelte';
 	import TrackTools from '$lib/track-tools.svelte';
 	import TrackEditorPanel from '$lib/track-editor-panel.svelte';
 	import { EXAMPLES } from '$lib/examples';
@@ -64,6 +65,10 @@
 	let editorSaved = false;
 	let mapBeforeEditing = MAPS[0].id;
 	let showCode = true;
+	/** Which program the left panel shows (and ▶ Run starts): the blocks or the Python editor. */
+	let leftTab: 'blocks' | 'python' = 'blocks';
+	let pythonIde: PythonIde;
+	let pythonRunning = false;
 	let runStartedAt: number | null = null;
 	let results: { name: string; seconds: number; track: string }[] = [];
 	let showTrail = true;
@@ -155,11 +160,56 @@
 		parsed = result;
 		programName = name;
 		if (remember) save(SAVED_PROGRAM_KEY, JSON.stringify({ name, project }));
-		flash(`Loaded "${name}". Press ▶ Run to start it.`);
+		const pythonCode = pythonFromTarget(result.robots[0]);
+		if (pythonCode && remember) {
+			await openPython(pythonCode, `${name}.py`);
+			flash(`Loaded "${name}" — it was saved in Python mode, so it opened in the 🐍 Python editor.`);
+		} else {
+			flash(`Loaded "${name}". Press ▶ Run to start it.`);
+		}
+	}
+
+	/** The Python code of a device saved in mBlock's Python mode, if any. */
+	function pythonFromTarget(target: any): string | null {
+		if (!target || target.editorMode === 'block') return null;
+		const codes = target.codes;
+		if (typeof codes === 'string' && codes.trim()) return codes;
+		if (codes && typeof codes === 'object') {
+			const value = codes.python ?? codes.upload ?? Object.values(codes).find((v) => typeof v === 'string');
+			if (typeof value === 'string' && value.trim()) return value;
+			if (value && typeof value === 'object' && typeof (value as any).code === 'string') return (value as any).code;
+		}
+		return null;
+	}
+
+	/** A robot with no block program, for running Python. */
+	async function ensureRobot() {
+		if (robots.length > 0) return;
+		await loadProgram(
+			{ targets: [{ isStage: true, name: 'Stage', variables: {}, lists: {}, broadcasts: {}, blocks: {} },
+				{ isStage: false, name: 'cyberpi', deviceId: 'cyberpi', loadedExtIds: ['mbot2'], variables: {}, lists: {}, broadcasts: {}, blocks: {} }] },
+			'Python program',
+			false,
+		);
+		notice = '';
+	}
+
+	/** Shows the Python editor, optionally with code from a file. */
+	async function openPython(code?: string, fileName?: string) {
+		await ensureRobot();
+		showCode = true;
+		leftTab = 'python';
+		await svelteTick();
+		if (code !== undefined) pythonIde?.loadCode(code, fileName);
 	}
 
 	async function openFile(file: File | undefined) {
 		if (!file) return;
+		if (/\.py$/i.test(file.name)) {
+			await openPython(await file.text(), file.name);
+			flash(`Opened "${file.name}". Press ▶ Run to start it.`);
+			return;
+		}
 		try {
 			await loadProgram(await readProjectFile(file), file.name.replace(/\.mblock$/i, ''));
 		} catch (error) {
@@ -179,10 +229,16 @@
 	function run() {
 		speaker.unlock();
 		runStartedAt = performance.now();
+		if (showCode && leftTab === 'python' && pythonIde) {
+			pythonIde.run();
+			return;
+		}
+		pythonIde?.stop();
 		for (const robot of robots) robot.launch();
 	}
 
 	function stop() {
+		pythonIde?.stop();
 		for (const robot of robots) {
 			robot.stopAll();
 			robot.body.stopMotors();
@@ -421,6 +477,7 @@
 		const file = e.dataTransfer?.files[0];
 		if (!file) return;
 		if (file.type.startsWith('image/')) openImage(file);
+		else if (/\.py$/i.test(file.name)) openFile(file);
 		else if (/\.json$/i.test(file.name)) {
 			file.text().then((text) => {
 				let parsedJson: unknown = null;
@@ -466,9 +523,10 @@
 		};
 		unsubscribeTick = world.onTick(() => {
 			for (const robot of robots) robot.tick();
+			pythonIde?.tick();
 		});
 		world.start();
-		if (import.meta.env.DEV) (window as any).__sim = { world, robots: () => robots };
+		if (import.meta.env.DEV) (window as any).__sim = { world, robots: () => robots, python: () => pythonIde };
 		uiTimer = setInterval(() => {
 			tick++;
 			running = robots.some((r) => r.isRunning);
@@ -502,7 +560,7 @@
 	<title>mBot2 Simulator</title>
 </svelte:head>
 
-<input bind:this={fileInput} type="file" accept=".mblock,.json" hidden on:change={(e) => { openFile(e.currentTarget.files?.[0]); e.currentTarget.value = ''; }} />
+<input bind:this={fileInput} type="file" accept=".mblock,.json,.py" hidden on:change={(e) => { openFile(e.currentTarget.files?.[0]); e.currentTarget.value = ''; }} />
 <input bind:this={imageInput} type="file" accept="image/*" hidden on:change={(e) => { openImage(e.currentTarget.files?.[0]); e.currentTarget.value = ''; }} />
 <input bind:this={trackInput} type="file" accept=".json" hidden on:change={(e) => { openTrackFile(e.currentTarget.files?.[0]); e.currentTarget.value = ''; }} />
 
@@ -531,7 +589,8 @@
 		{#if programName}
 			<span class="program" title="Loaded program">{programName}</span>
 		{/if}
-		<button class="tool" class:pressed={showCode} on:click={() => (showCode = !showCode)} disabled={!entity} title="Show the program's blocks">🧩 Code</button>
+		<button class="tool" class:pressed={showCode && leftTab === 'blocks'} on:click={() => { if (showCode && leftTab === 'blocks') showCode = false; else { showCode = true; leftTab = 'blocks'; } }} disabled={!entity} title="Show the program's blocks">🧩 Blocks</button>
+		<button class="tool" class:pressed={showCode && leftTab === 'python'} on:click={() => { if (showCode && leftTab === 'python') showCode = false; else openPython(); }} title="Write the program in Python (mBlock Python)">🐍 Python</button>
 
 		<div class="run-controls">
 			<button class="tool go" on:click={run} disabled={robots.length === 0} title="Start the program (like turning the robot on)">
@@ -566,12 +625,27 @@
 		</label>
 	</header>
 
-	<main class:with-code={showCode && entity && !editor}>
-		{#if showCode && entity && !editor}
-			<section class="code">
-				{#key entity}
-					<CodeView {entity} {tick} />
-				{/key}
+	<main class:with-code={showCode && entity && !editor} class:wide-code={leftTab === 'python'}>
+		{#if entity}
+			<!-- Kept alive while hidden so a running Python program keeps going. -->
+			<section class="code" class:hidden={!showCode || editor}>
+				<div class="code-tabs">
+					<button class:active={leftTab === 'blocks'} on:click={() => (leftTab = 'blocks')}>🧩 Blocks</button>
+					<button class:active={leftTab === 'python'} on:click={() => (leftTab = 'python')}>🐍 Python{#if pythonRunning} <span class="dot" />{/if}</button>
+				</div>
+				<div class="code-body" class:hidden={leftTab !== 'blocks'}>
+					{#key entity}
+						<CodeView {entity} {tick} />
+					{/key}
+				</div>
+				<div class="code-body" class:hidden={leftTab !== 'python'}>
+					<PythonIde
+						bind:this={pythonIde}
+						{entity}
+						on:state={(e) => (pythonRunning = e.detail.running)}
+						on:example={(e) => changeMap(e.detail.mapId)}
+					/>
+				</div>
 			</section>
 		{/if}
 		<section class="stage" class:dragover={dragOver}>
@@ -617,6 +691,7 @@
 						<li>Drop that file here, or click the button below.</li>
 					</ol>
 					<button class="tool primary big" on:click={() => fileInput.click()}>📂 Open my .mblock file</button>
+					<button class="tool big" on:click={() => openPython()}>🐍 Write a Python program</button>
 					<p class="muted">…or try an example:</p>
 					<div class="examples">
 						{#each EXAMPLES as example}
@@ -847,12 +922,53 @@
 		&.with-code {
 			grid-template-columns: minmax(260px, 340px) 1fr 380px;
 		}
+		&.with-code.wide-code {
+			grid-template-columns: minmax(320px, 480px) 1fr 360px;
+		}
 	}
 	.code {
 		min-height: 0;
 		min-width: 0;
 		border-right: 1px solid var(--border);
 		background: var(--panel);
+		display: flex;
+		flex-direction: column;
+		&.hidden {
+			display: none;
+		}
+	}
+	.code-tabs {
+		display: flex;
+		border-bottom: 1px solid var(--border);
+		button {
+			flex: 1;
+			border: none;
+			background: var(--panel-2);
+			padding: 7px;
+			font-weight: 700;
+			color: var(--muted);
+			border-bottom: 3px solid transparent;
+			&.active {
+				background: var(--panel);
+				color: var(--text);
+				border-bottom-color: var(--primary);
+			}
+		}
+		.dot {
+			display: inline-block;
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: var(--go);
+			margin-left: 4px;
+		}
+	}
+	.code-body {
+		flex: 1;
+		min-height: 0;
+		&.hidden {
+			display: none;
+		}
 	}
 	.tool.pressed {
 		background: #e3f0ff;

@@ -21,6 +21,27 @@ The side panel shows what the robot "feels" live: ultrasonic distance, line devi
 
 The **🧩 Code** panel on the left shows the program's blocks the way mBlock does. Scripts that are running glow yellow and the block being executed lights up, so students can follow their code step by step. Clicking a hat block runs that script.
 
+## Python (mBlock Python)
+
+Click **🐍 Python** in the header for a Python editor next to the robot. Programs use the same libraries as mBlock's Python editor for CyberPi and mBot2 (upload mode), so code runs unchanged on the real robot:
+
+```python
+import cyberpi, mbot2, mbuild, event
+
+@event.is_press('a')
+def follow():
+    while True:
+        offset = mbuild.quad_rgb_sensor.get_offset_track(1)
+        mbot2.drive_power(30 - 0.8 * offset, -(30 + 0.8 * offset))
+```
+
+- **Libraries:** `cyberpi` (console, display, charts, LEDs, audio, buttons/joystick, timer, motion sensors, broadcasts), `mbot2` (forward/backward/turn_left/turn_right with `run_time`, `straight`, `turn`, `drive_power`, `drive_speed`, encoder motor `EM_*`, servos and DC motors), `mbuild.quad_rgb_sensor` and `mbuild.ultrasonic2`, `event` decorators (`start`, `is_press`, `receive`, `greater_than`, `smaller_than`, tilt events) and `time`. The `cyberpi.mbot2` / `cyberpi.ultrasonic2` / `cyberpi.quad_rgb_sensor` style and `import cyberpi as cpi` work too.
+- **Editor:** syntax colours, line numbers, autocomplete for the robot API (also after `import cyberpi as cpi`), Ctrl+Enter or F5 to run, examples, open/download `.py` files. `print()` output and errors (with the line highlighted) appear in the output panel; CyberPi's screen shows `console.println`.
+- **Opening programs:** `.py` files open in the Python editor (button or drag and drop). An `.mblock` project saved in mBlock's Python mode opens there automatically.
+- Event handlers run side by side like CyberPi's threads, `while True:` loops never freeze the page, and ■ Stop / `cyberpi.stop_other()` stop scripts immediately.
+
+Python runs in the browser with [Skulpt](https://skulpt.org), so it covers the Python that classes use (functions, classes, lists, dicts, f-strings, `random`, `math`), not every CPython library.
+
 ## For teachers: tracks
 
 Pick **Track → ➕ New empty track…**, or press **✏️** in the left toolbar to edit the current track (built-in tracks are edited as a copy). Tools:

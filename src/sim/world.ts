@@ -47,7 +47,11 @@ export type QuadReading = {
   probes: Record<ProbeName, ProbeReading>;
   /** -100 (robot is left of the line) … 100 (robot is right of the line). */
   deviation: number;
-  /** Bits L2 L1 R1 R2 (L2 is the most significant bit) of probes that see the line. */
+  /**
+   * Line-following status like the real sensor reports it: bits L2 L1 R1 R2
+   * (L2 is the most significant bit), 1 = the probe sees the mat, 0 = it's on
+   * the line. 15 means no line, 0 means all four probes are on the line.
+   */
   lineStatus: number;
 };
 
@@ -315,7 +319,7 @@ export class World {
       const gray = grayOf(rgb);
       const isLine = lineBrightness(rgb) < LINE_THRESHOLD;
       probes[name] = { name, rgb, gray, color: classifyColor(rgb), isLine };
-      if (isLine) lineStatus |= 1 << (3 - i);
+      if (!isLine) lineStatus |= 1 << (3 - i);
     }
 
     // The deviation is computed from a fine scan across the sensor bar, which
@@ -362,8 +366,9 @@ export class World {
         if (d !== null && d < best) best = d;
       }
     }
-    if (best > ULTRASONIC_MAX_CM) return ULTRASONIC_MAX_CM;
-    return Math.max(ULTRASONIC_MIN_CM, Math.round(best * 10) / 10);
+    // Nothing in range, or closer than the sensor can measure: it reads 300.
+    if (best > ULTRASONIC_MAX_CM || best < ULTRASONIC_MIN_CM) return ULTRASONIC_MAX_CM;
+    return Math.round(best * 10) / 10;
   }
 }
 
